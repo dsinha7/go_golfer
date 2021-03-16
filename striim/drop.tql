@@ -1,0 +1,1 @@
+drop APPLICATION app_table_session CASCADE;

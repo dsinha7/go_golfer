@@ -1,0 +1,56 @@
+drop APPLICATION sample_table_migration CASCADE;
+CREATE APPLICATION sample_table_migration;
+
+CREATE FLOW ReadMYSQL;
+
+
+CREATE TYPE WFSampleEntry (
+mid java.lang.Integer,
+md5 java.lang.String,
+sha1 java.lang.String,
+sha256 java.lang.String,
+status java.lang.Integer,
+create_date org.joda.time.DateTime,
+update_date org.joda.time.DateTime
+);
+
+
+END FLOW ReadMYSQL;
+
+ALTER FLOW ReadMYSQL;
+
+CREATE OR REPLACE SOURCE wilshard USING Global.DatabaseReader ( 
+  Username: 'dsinha', 
+  DatabaseProviderType: 'Default', 
+  FetchSize: 100, 
+  ReturnDateTimeAs: 'String',
+  adapterName: 'DatabaseReader', 
+  QuiesceOnILCompletion: false, 
+  Password_encrypted: 'false', 
+  ConnectionURL: 'jdbc:mysql://**********/shard_db', 
+  Tables: 'shard_db.sample', 
+  Password: '******' ) 
+OUTPUT TO RAW_DATA;
+
+CREATE STREAM SampleModifiedData OF WFSampleEntry;
+
+CREATE CQ POPULATE_SAMPLE_TABLE 
+INSERT INTO SampleModifiedData 
+SELECT data[0],data[1],data[2],data[3],data[4],
+TO_DATE(data[5]),
+CASE WHEN data[] THEN DNOW() ELSE TO_DATE(data[6]) END
+FROM RAW_DATA;	
+
+
+CREATE TARGET spanner USING Global.SpannerWriter ( 
+  InstanceID: 'wildfire', 
+  CheckpointTable: 'CHKPOINT', 
+  BatchPolicy: 'EventCount: 1000, Interval: 60s', 
+  ParallelThreads: '', 
+  ServiceAccountKey: '/opt/striim/striim-spanner-key.json', 
+  Tables: 'example-db.samples' ) 
+INPUT FROM SampleModifiedData;
+
+	
+END FLOW ReadMYSQL;
+

@@ -1,0 +1,95 @@
+drop APPLICATION app_table_session CASCADE;
+
+IMPORT STATIC com.migration.CustomFunctions.*;
+
+CREATE APPLICATION app_table_session;
+
+CREATE FLOW session1;
+
+
+CREATE TYPE SessionEntry (
+id String,
+psession_id Long,     
+sha256 byte[],     
+create_time org.joda.time.DateTime, 
+src_ip String,              
+src_port java.lang.Integer,                 
+dst_ip String,              
+dst_port java.lang.Integer,                 
+fileurl String,            
+filename String,           
+device_id String,  
+company_id java.lang.Integer,               
+session_id java.lang.Integer,               
+username String,            
+vsys java.lang.Integer,                     
+app String,                 
+device_hostname String,    
+hostname String,           
+uri String,                
+emailheader String, 
+tbd_int_1 java.lang.Integer,                
+tbd_int_2 java.lang.Integer,                
+tbd_char_1 java.lang.String,         
+tbd_char_2 java.lang.String,         
+tbd_text_1 java.lang.String,         
+tbd_text_2 java.lang.String               
+);
+
+CREATE OR REPLACE SOURCE shard_session USING Global.DatabaseReader ( 
+  Username: 'dsinha', 
+  DatabaseProviderType: 'Default', 
+  FetchSize: 100, 
+  ReturnDateTimeAs: 'String',
+  adapterName: 'DatabaseReader', 
+  QuiesceOnILCompletion: false, 
+  Password_encrypted: 'false', 
+  ConnectionURL: 'jdbc:mysql://34.69.212.231:3306/wildfire_shard_db?zeroDateTimeBehavior=round&tinyInt1isBit=false', 
+  Tables: 'wildfire_shard_db.session', 
+  Password: 'dsinha' ) 
+OUTPUT TO RAW_DATA;
+
+CREATE STREAM SessionModifiedData OF SessionEntry;
+
+CREATE CQ POPULATE_SESSION_TABLE 
+INSERT INTO SessionModifiedData 
+SELECT TO_STRING(data[0]),
+data[1],     
+data[2],     
+TO_DATE(data[3]), 
+data[4],              
+data[5],                 
+data[6],              
+data[7],                 
+data[8],            
+data[9],           
+data[10],  
+data[11],               
+data[12],               
+data[13],            
+data[14],                     
+data[15],                 
+data[16],    
+data[17],           
+data[18],                
+data[19], 
+data[20],                
+data[21],                
+data[22],         
+data[23],         
+data[24],         
+data[25] 
+FROM RAW_DATA;
+
+CREATE TARGET spanner_session USING Global.SpannerWriter ( 
+  InstanceID: 'wildfire', 
+  CheckpointTable: 'CHKPOINT', 
+  BatchPolicy: 'EventCount: 1000, Interval: 60s', 
+  ParallelThreads: '', 
+  ServiceAccountKey: '/opt/striim/striim-spanner-key.json', 
+  Tables: 'striim.session' ) 
+INPUT FROM SessionModifiedData;
+    
+END FLOW session1;
+
+END APPLICATION app_table_session;

@@ -1,0 +1,60 @@
+drop APPLICATION WildFire_sample_table_migration CASCADE;
+
+IMPORT STATIC com.migration.CustomFunctions.*;
+CREATE APPLICATION WildFire_sample_table_migration;
+
+CREATE FLOW ReadMYSQL;
+
+
+CREATE TYPE WFSampleEntry (
+mid String,
+mid_hash java.math.BigInteger,
+md5 byte[],
+sha1 byte[],
+sha256 byte[],
+status java.lang.Short,
+create_date org.joda.time.DateTime,
+update_date org.joda.time.DateTime
+);
+
+
+END FLOW ReadMYSQL;
+
+ALTER FLOW ReadMYSQL;
+
+CREATE OR REPLACE SOURCE wilshard USING Global.DatabaseReader ( 
+  Username: 'dsinha', 
+  DatabaseProviderType: 'Default', 
+  FetchSize: 100, 
+  ReturnDateTimeAs: 'String',
+  adapterName: 'DatabaseReader', 
+  QuiesceOnILCompletion: false, 
+  Password_encrypted: 'false', 
+  ConnectionURL: 'jdbc:mysql://34.69.212.231:3306/wildfire_shard_db?zeroDateTimeBehavior=round', 
+  Tables: 'wildfire_shard_db.sample', 
+  Password: 'dsinha' ) 
+OUTPUT TO RAW_DATA;
+
+CREATE STREAM SampleModifiedData OF WFSampleEntry;
+
+CREATE CQ POPULATE_SAMPLE_TABLE 
+INSERT INTO SampleModifiedData 
+SELECT asString(data[0]),
+farmFingerPrint(data[0]),
+data[1],data[2],data[3],data[4],
+TO_DATE(data[5]),
+TO_DATE(data[6]) FROM RAW_DATA;	
+
+
+CREATE TARGET spanner USING Global.SpannerWriter ( 
+  InstanceID: 'wildfire', 
+  CheckpointTable: 'CHKPOINT', 
+  BatchPolicy: 'EventCount: 1000, Interval: 60s', 
+  ParallelThreads: '', 
+  ServiceAccountKey: '/opt/striim/striim-spanner-key.json', 
+  Tables: 'example-db.sample_h' ) 
+INPUT FROM SampleModifiedData;
+
+	
+END FLOW ReadMYSQL;
+

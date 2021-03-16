@@ -1,0 +1,91 @@
+drop APPLICATION app_table_task CASCADE;
+
+IMPORT STATIC com.migration.CustomFunctions.*;
+
+CREATE APPLICATION app_table_task;
+
+CREATE FLOW task;
+
+
+CREATE TYPE TaskEntry (
+task_id String,            
+filename String,              
+url String,                   
+md5 byte[],                    
+submitted_time org.joda.time.DateTime, 
+start_time org.joda.time.DateTime,     
+finish_time org.joda.time.DateTime,    
+status String,                  
+priority Float,                  
+vmg_id Integer,                      
+vm_id Integer,                       
+malware Short,                     
+score Float,                     
+family String,                
+sha256 byte[],                 
+summary String,               
+report String,                 
+platform Integer, 
+tbd_int_1 java.lang.Integer,                
+tbd_int_2 java.lang.Integer,                
+tbd_char_1 java.lang.String,         
+tbd_char_2 java.lang.String,         
+tbd_text_1 java.lang.String,         
+tbd_text_2 java.lang.String               
+);
+
+CREATE OR REPLACE SOURCE shard_task USING Global.DatabaseReader ( 
+  Username: 'dsinha', 
+  DatabaseProviderType: 'Default', 
+  FetchSize: 100, 
+  ReturnDateTimeAs: 'String',
+  adapterName: 'DatabaseReader', 
+  QuiesceOnILCompletion: false, 
+  Password_encrypted: 'false', 
+  ConnectionURL: 'jdbc:mysql://34.69.212.231:3306/wildfire_shard_db?zeroDateTimeBehavior=round&tinyInt1isBit=false', 
+  Tables: 'wildfire_shard_db.task', 
+  Password: 'dsinha' ) 
+OUTPUT TO RAW_DATA;
+
+CREATE STREAM TaskModifiedData OF TaskEntry;
+
+CREATE CQ POPULATE_TASK_TABLE 
+INSERT INTO TaskModifiedData 
+SELECT TO_STRING(data[0]),
+data[1],              
+data[2],                   
+data[3],                    
+TO_DATE(data[4]), 
+TO_DATE(data[5]),     
+TO_DATE(data[6]),    
+data[7],                  
+data[8],                  
+data[9],                      
+data[10],                       
+data[11],                     
+data[12],                     
+data[13],                
+data[14],                 
+data[15],               
+data[16],                 
+data[17], 
+data[18],                
+data[19],                
+data[20],         
+data[21],         
+data[22],         
+data[23]     
+FROM RAW_DATA;
+
+CREATE TARGET spanner_task USING Global.SpannerWriter ( 
+  InstanceID: 'wildfire', 
+  CheckpointTable: 'CHKPOINT', 
+  BatchPolicy: 'EventCount: 1000, Interval: 60s', 
+  ParallelThreads: '', 
+  ServiceAccountKey: '/opt/striim/striim-spanner-key.json', 
+  Tables: 'striim.task' ) 
+INPUT FROM TaskModifiedData;
+    
+END FLOW task;
+
+END APPLICATION app_table_task;

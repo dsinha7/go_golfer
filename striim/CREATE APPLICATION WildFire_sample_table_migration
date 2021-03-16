@@ -1,0 +1,37 @@
+CREATE APPLICATION WildFire_sample_table_migration;
+
+CREATE FLOW ReadMYSQL;
+
+CREATE TYPE Log4JEntry (
+ logTime org.joda.time.DateTime,
+ level java.lang.String,
+ message java.lang.String,
+ api java.lang.String,
+ sessionId java.lang.String,
+ userId java.lang.String,
+ sobject java.lang.String,
+ xception java.lang.String,
+ className java.lang.String,
+ method java.lang.String,
+ fileName java.lang.String,
+ lineNum java.lang.String);
+
+END FLOW ReadMYSQL;
+
+ALTER FLOW ReadMYSQL;
+
+CREATE OR REPLACE SOURCE wildfire_shard USING Global.DatabaseReader ( 
+  Username: 'dsinha', 
+  DatabaseProviderType: 'Default', 
+  FetchSize: 100, 
+  adapterName: 'DatabaseReader', 
+  QuiesceOnILCompletion: false, 
+  Password_encrypted: 'true', 
+  ConnectionURL: 'jdbc:mysql://34.69.212.231:3306/wildfire_shard_db', 
+  Tables: 'wildfire_shard_db.sample', 
+  Password: '8aanjPqOTjL1XP0ghSPVng==' ) 
+OUTPUT TO RAW_DATA;
+
+
+END FLOW ReadMYSQL;
+

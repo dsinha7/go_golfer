@@ -1,0 +1,32 @@
+drop APPLICATION app_table_doc2macro CASCADE;
+
+CREATE APPLICATION app_table_doc2macro;
+
+CREATE FLOW doc2macro;
+
+
+CREATE OR REPLACE SOURCE shard_doc2macro USING Global.DatabaseReader ( 
+  Username: 'dsinha', 
+  DatabaseProviderType: 'Default', 
+  FetchSize: 100, 
+  ReturnDateTimeAs: 'String',
+  adapterName: 'DatabaseReader', 
+  QuiesceOnILCompletion: false, 
+  Password_encrypted: 'false', 
+  ConnectionURL: 'jdbc:mysql://34.69.212.231:3306/wildfire_shard_db?zeroDateTimeBehavior=round', 
+  Tables: 'wildfire_shard_db.doc2macro', 
+  Password: 'dsinha' ) 
+OUTPUT TO RAW_DATA;
+
+CREATE TARGET spanner_doc2macro USING Global.SpannerWriter ( 
+  InstanceID: 'wildfire', 
+  CheckpointTable: 'CHKPOINT', 
+  BatchPolicy: 'EventCount: 1000, Interval: 60s', 
+  ParallelThreads: '', 
+  ServiceAccountKey: '/opt/striim/striim-spanner-key.json', 
+  Tables: 'wildfire_shard_db.doc2macro,striim.doc2macro' ) 
+INPUT FROM RAW_DATA;
+	
+END FLOW doc2macro;
+
+END APPLICATION app_table_doc2macro;
