@@ -86,7 +86,6 @@ TO_DATE(data[28])
 FROM RAW_DATA; 
 
 
-
 CREATE TARGET spanner_sample USING Global.SpannerWriter ( 
   InstanceID: 'wildfire', 
   CheckpointTable: 'CHKPOINT', 
