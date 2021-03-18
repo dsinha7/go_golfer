@@ -1,0 +1,100 @@
+drop APPLICATION app_table_sample_cdc CASCADE;
+
+IMPORT STATIC com.migration.CustomFunctions.*;
+
+CREATE APPLICATION app_table_sample_cdc;
+
+CREATE FLOW sample1_cdc;
+
+
+CREATE TYPE SampleEntryCDC (
+mid String,
+md5 byte[],
+sha1 byte[],
+sha256 byte[],
+status java.lang.Short,
+create_date org.joda.time.DateTime,
+update_date org.joda.time.DateTime,
+source1 byte,
+filename java.lang.String,
+filetype byte,
+size java.lang.Integer,
+analysis byte,
+malware byte,
+download_url byte,
+md5_verify byte,
+digital_signer java.lang.String,
+vt_hit byte,
+local_url java.lang.String,
+summary java.lang.String,
+finish_date org.joda.time.DateTime,
+fcopy java.lang.Integer,
+tbd_int_1 java.lang.Integer,
+tbd_int_2 java.lang.Integer,
+tbd_char_1 java.lang.String,
+tbd_char_2 java.lang.String,
+tbd_text_1 java.lang.String,
+tbd_text_2 java.lang.String,
+tbd_ts_1 org.joda.time.DateTime,
+tbd_ts_2 org.joda.time.DateTime
+);
+
+
+
+CREATE SOURCE sample_cdc_source USING MysqlReader  (
+ConnectionURL: 'jdbc:mysql://34.69.212.231:3306/wildfire_shard_db?zeroDateTimeBehavior=round&tinyInt1isBit=false',
+  Username: 'dsinha',
+  Compression: false,
+  Password_encrypted: 'false',
+  connectionRetryPolicy: 'retryInterval=30, maxRetries=3',
+  FilterTransactionBoundaries: true,
+  Tables: 'wildfire_shard_db.sample',
+  Password: 'dsinha',
+  SendBeforeImage: true )
+OUTPUT TO sample_raw_cdc  ;
+
+
+CREATE STREAM SampleModifiedDataCDC OF SampleEntryCDC;
+
+CREATE CQ POPULATE_SAMPLE_TABLE_CDC
+INSERT INTO SampleModifiedDataCDC
+SELECT TO_STRING(data[0]),
+data[1],data[2],data[3],data[4],
+TO_DATE(data[5]),
+TO_DATE(data[6]),
+data[7],
+data[8],
+data[9],
+data[10],
+data[11],
+data[12],
+data[13],
+data[14],
+data[15],
+data[16],
+data[17],
+data[18],
+TO_DATE(data[19]),
+data[20],
+data[21],
+data[22],
+data[23],
+data[24],
+data[25],
+data[26],
+TO_DATE(data[27]),
+TO_DATE(data[28])
+FROM sample_raw_cdc;
+
+CREATE TARGET spanner_sample_cdc USING Global.SpannerWriter (
+  InstanceID: 'wildfire',
+  CheckpointTable: 'CHKPOINT',
+  BatchPolicy: 'EventCount: 1000, Interval: 60s',
+  ParallelThreads: '',
+  ServiceAccountKey: '/opt/striim/striim-spanner-key.json',
+  Tables: 'striim.sample' )
+INPUT FROM SampleModifiedDataCDC;
+
+END FLOW sample1_cdc;
+
+END APPLICATION app_table_sample_cdc;
